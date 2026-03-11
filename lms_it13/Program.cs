@@ -8,12 +8,12 @@ namespace lms_it13
         [STAThread]
         static void Main()
         {
-<<<<<<< HEAD
+
             ApplicationConfiguration.Initialize();
-=======
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
->>>>>>> @{-1}
+
             Application.Run(new LoginForm());
         }
     }

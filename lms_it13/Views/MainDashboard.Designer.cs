@@ -54,7 +54,6 @@
             panelContent.Name = "panelContent";
             panelContent.Size = new Size(600, 473);
             panelContent.TabIndex = 2;
-            panelContent.Paint += panelContent_Paint;
             // 
             // panelSidebar
             // 
@@ -192,7 +191,6 @@
             lblLoggedUser.Size = new Size(71, 15);
             lblLoggedUser.TabIndex = 0;
             lblLoggedUser.Text = "logged in as";
-            lblLoggedUser.Click += lblLoggedUser_Click;
             // 
             // btnLogout
             // 
@@ -215,7 +213,6 @@
             panelTop.Name = "panelTop";
             panelTop.Size = new Size(600, 33);
             panelTop.TabIndex = 1;
-            panelTop.Paint += panelTop_Paint;
             // 
             // MainDashboard
             // 
@@ -227,7 +224,6 @@
             Controls.Add(panelSidebar);
             Name = "MainDashboard";
             Text = "Form1";
-            Load += MainDashboard_Load;
             panelSidebar.ResumeLayout(false);
             panelTop.ResumeLayout(false);
             panelTop.PerformLayout();
