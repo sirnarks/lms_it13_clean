@@ -128,6 +128,7 @@
             btnFines.TabIndex = 5;
             btnFines.Text = "Fines";
             btnFines.UseVisualStyleBackColor = true;
+            btnFines.Click += btnFines_Click;
             // 
             // btnSales
             // 
@@ -138,6 +139,7 @@
             btnSales.TabIndex = 4;
             btnSales.Text = "Sales";
             btnSales.UseVisualStyleBackColor = true;
+            btnSales.Click += btnSales_Click;
             // 
             // btnPayments
             // 

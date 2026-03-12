@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Data.SqlClient;
+using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -104,39 +105,44 @@ namespace lms_it13
 
         private void BtnLogin_Click(object sender, EventArgs e)
         {
-            string username = txtUsername.Text.Trim().ToLower();
+            string username = txtUsername.Text.Trim();
             string password = txtPassword.Text.Trim();
 
-            UserRole? role = null;
-
-            // 🔹 Super Admin
-            if (username == "superadmin" && password == "1234")
-                role = UserRole.SuperAdmin;
-
-            // 🔹 Admin
-            else if (username == "admin" && password == "1234")
-                role = UserRole.Admin;
-
-            // 🔹 Librarian
-            else if (username == "librarian" && password == "1234")
-                role = UserRole.Librarian;
-
-            // 🔹 Member
-            else if (username == "member" && password == "1234")
-                role = UserRole.Member;
-
-            if (role != null)
+            if (username == "" || password == "")
             {
-                this.Hide();
-                MainDashboard dashboard = new MainDashboard(role.Value, username);
-                dashboard.Show();
+                MessageBox.Show("Please enter username and password.");
+                return;
             }
-            else
+
+            using (SqlConnection conn = new SqlConnection(DatabaseHelper.ConnectionString))
             {
-                MessageBox.Show("Invalid credentials.",
-                    "Login Failed",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
+                conn.Open();
+
+                string query = "SELECT Role FROM Users WHERE Username = @username AND Password = @password";
+
+                using (SqlCommand cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@username", username);
+                    cmd.Parameters.AddWithValue("@password", password);
+
+                    var result = cmd.ExecuteScalar();
+
+                    if (result != null)
+                    {
+                        string roleString = result.ToString();
+
+                        UserRole role = Enum.Parse<UserRole>(roleString);
+
+                        this.Hide();
+                        MainDashboard dashboard = new MainDashboard(role, username);
+                        dashboard.Show();
+                    }
+                    else
+                    {
+                        MessageBox.Show("Invalid credentials.", "Login Failed",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                }
             }
         }
     }
