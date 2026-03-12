@@ -1,19 +1,20 @@
-﻿using System;
+﻿using Microsoft.Data.SqlClient;
+using System;
 using System.Drawing;
-using System.Linq;
 using System.Windows.Forms;
-using lms_it13.Repositories;
-using lms_it13.Models;
 
 namespace lms_it13.Views
 {
     public partial class ManageMyBooksControl : UserControl
     {
-        private DataGridView gridMyBooks;
+        private DataGridView dgvMyBooks;
         private Button btnReturn;
+        private Panel bottomPanel;
+        private string currentUsername;
 
-        public ManageMyBooksControl()
+        public ManageMyBooksControl(string username)
         {
+            currentUsername = username;
             BuildUI();
             LoadBorrowedBooks();
         }
@@ -23,76 +24,127 @@ namespace lms_it13.Views
             this.Dock = DockStyle.Fill;
             this.BackColor = ColorTranslator.FromHtml("#F7F8F0");
 
-            // ===== GRID =====
-            gridMyBooks = new DataGridView();
-            gridMyBooks.Dock = DockStyle.Fill;
-            gridMyBooks.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            gridMyBooks.AllowUserToAddRows = false;
-            gridMyBooks.RowHeadersVisible = false;
-            gridMyBooks.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            gridMyBooks.MultiSelect = false;
+            // ===== DATAGRID =====
+            dgvMyBooks = new DataGridView();
+            dgvMyBooks.Dock = DockStyle.Fill;
+            dgvMyBooks.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            dgvMyBooks.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgvMyBooks.AllowUserToAddRows = false;
+            dgvMyBooks.MultiSelect = false;
+            dgvMyBooks.RowHeadersVisible = false;
 
-            this.Controls.Add(gridMyBooks);
+            dgvMyBooks.Columns.Add("BorrowId", "BorrowId");
+            dgvMyBooks.Columns["BorrowId"].Visible = false;
+
+            dgvMyBooks.Columns.Add("Title", "Title");
+            dgvMyBooks.Columns.Add("BorrowDate", "Borrow Date");
+            dgvMyBooks.Columns.Add("DueDate", "Due Date");
+
+            // ===== BOTTOM PANEL =====
+            bottomPanel = new Panel();
+            bottomPanel.Dock = DockStyle.Bottom;
+            bottomPanel.Height = 70;
+            bottomPanel.BackColor = Color.WhiteSmoke;
 
             // ===== RETURN BUTTON =====
             btnReturn = new Button();
-            btnReturn.Text = "Return Book";
-            btnReturn.Height = 45;
-            btnReturn.Dock = DockStyle.Bottom;
+            btnReturn.Text = "Return Selected Book";
+            btnReturn.Width = 200;
+            btnReturn.Height = 40;
             btnReturn.BackColor = ColorTranslator.FromHtml("#355872");
             btnReturn.ForeColor = Color.White;
             btnReturn.FlatStyle = FlatStyle.Flat;
             btnReturn.FlatAppearance.BorderSize = 0;
+
+            // Center button
+            btnReturn.Location = new Point(
+                (bottomPanel.Width - btnReturn.Width) / 2,
+                (bottomPanel.Height - btnReturn.Height) / 2
+            );
+
+            btnReturn.Anchor = AnchorStyles.None;
+
             btnReturn.Click += BtnReturn_Click;
 
-            this.Controls.Add(btnReturn);
+            bottomPanel.Controls.Add(btnReturn);
+
+            // ===== ADD TO CONTROL =====
+            this.Controls.Add(dgvMyBooks);
+            this.Controls.Add(bottomPanel);
         }
 
         private void LoadBorrowedBooks()
         {
-            gridMyBooks.Columns.Clear();
+            dgvMyBooks.Rows.Clear();
 
-            gridMyBooks.Columns.Add("BookId", "ISBN");
-            gridMyBooks.Columns.Add("Title", "Title");
-            gridMyBooks.Columns.Add("BorrowDate", "Borrow Date");
-            gridMyBooks.Columns.Add("DueDate", "Due Date");
-
-            gridMyBooks.Rows.Clear();
-
-            // Load only NOT returned books
-            foreach (var record in BorrowRepository.BorrowedBooks
-                         .Where(r => !r.Returned))
+            using (SqlConnection conn = new SqlConnection(DatabaseHelper.ConnectionString))
             {
-                gridMyBooks.Rows.Add(
-                    record.BookId,
-                    record.Title,
-                    record.BorrowDate.ToShortDateString(),
-                    record.DueDate.ToShortDateString()
-                );
+                conn.Open();
+
+                string query = @"
+                    SELECT bb.Id, b.Title, bb.BorrowDate, bb.DueDate
+                    FROM BorrowedBooks bb
+                    JOIN Books b ON bb.BookId = b.Id
+                    WHERE bb.Username = @username AND bb.Returned = 0";
+
+                using (SqlCommand cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@username", currentUsername);
+
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            dgvMyBooks.Rows.Add(
+                                reader["Id"],
+                                reader["Title"],
+                                Convert.ToDateTime(reader["BorrowDate"]).ToShortDateString(),
+                                Convert.ToDateTime(reader["DueDate"]).ToShortDateString()
+                            );
+                        }
+                    }
+                }
             }
         }
 
         private void BtnReturn_Click(object sender, EventArgs e)
         {
-            if (gridMyBooks.SelectedRows.Count == 0)
+            if (dgvMyBooks.SelectedRows.Count == 0)
             {
-                MessageBox.Show("Select a book to return.");
+                MessageBox.Show("Please select a book to return.");
                 return;
             }
 
-            string isbn = gridMyBooks.SelectedRows[0].Cells["BookId"].Value.ToString();
+            int borrowId = Convert.ToInt32(
+                dgvMyBooks.SelectedRows[0].Cells["BorrowId"].Value
+            );
 
-            var record = BorrowRepository.BorrowedBooks
-                .FirstOrDefault(r => r.BookId == isbn && !r.Returned);
-
-            if (record != null)
+            using (SqlConnection conn = new SqlConnection(DatabaseHelper.ConnectionString))
             {
-                record.Returned = true;
-                record.ReturnDate = DateTime.Now;
+                conn.Open();
 
-                MessageBox.Show("Book returned successfully!");
+                // Mark as returned
+                string returnQuery = "UPDATE BorrowedBooks SET Returned = 1 WHERE Id = @id";
+                using (SqlCommand cmd = new SqlCommand(returnQuery, conn))
+                {
+                    cmd.Parameters.AddWithValue("@id", borrowId);
+                    cmd.ExecuteNonQuery();
+                }
+
+                // Make book available again
+                string updateBook = @"
+                    UPDATE Books 
+                    SET Status = 'Available'
+                    WHERE Id = (SELECT BookId FROM BorrowedBooks WHERE Id = @id)";
+
+                using (SqlCommand cmd = new SqlCommand(updateBook, conn))
+                {
+                    cmd.Parameters.AddWithValue("@id", borrowId);
+                    cmd.ExecuteNonQuery();
+                }
             }
 
+            MessageBox.Show("Book returned successfully!");
             LoadBorrowedBooks();
         }
     }

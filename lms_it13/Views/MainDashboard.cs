@@ -9,7 +9,7 @@ namespace lms_it13
     {
         private UserRole currentRole;
         private string loggedInUser;
-
+        private string currentUsername;
 
         public MainDashboard(UserRole role, string username)
         {
@@ -83,6 +83,8 @@ namespace lms_it13
             StyleSidebarButtons();
         }
 
+
+
         private void StyleSidebarButtons()
         {
             foreach (Control ctrl in panelSidebar.Controls)
@@ -113,10 +115,10 @@ namespace lms_it13
             => LoadUserControl(new ManageBooksControl());
 
         private void btnBrowseBooks_Click(object sender, EventArgs e)
-            => LoadUserControl(new BrowseBooksControl());
+            => LoadUserControl(new BrowseBooksControl(loggedInUser));
 
         private void btnMyBorrowedBooks_Click(object sender, EventArgs e)
-            => LoadUserControl(new ManageMyBooksControl());
+            => LoadUserControl(new ManageMyBooksControl(loggedInUser));
 
         private void btnReports_Click(object sender, EventArgs e)
             => LoadUserControl(new ReportsControl());
@@ -125,10 +127,17 @@ namespace lms_it13
             => LoadUserControl(new TermsControl());
 
         private void btnPayments_Click(object sender, EventArgs e)
-            => LoadUserControl(new PaymentsControl());
+            => LoadUserControl(new PaymentsControl(loggedInUser));
 
         private void btnUsers_Click(object sender, EventArgs e)
             => LoadUserControl(new UserManagementControl(currentRole));
+
+        private void btnFines_Click(object sender, EventArgs e)
+          => LoadUserControl(new FinesControl());
+
+        private void btnSales_Click(object sender, EventArgs e)
+          => LoadUserControl(new SalesControl());
+    
 
         private void btnLogout_Click(object sender, EventArgs e)
         {
@@ -152,6 +161,5 @@ namespace lms_it13
             base.OnFormClosing(e);
             Application.Exit();
         }
-
     }
 }

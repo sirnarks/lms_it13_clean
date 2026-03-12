@@ -1,28 +1,23 @@
-﻿using System;
+﻿using Microsoft.Data.SqlClient;
+using System;
 using System.Drawing;
 using System.Windows.Forms;
-using lms_it13.Repositories;
-using lms_it13.Models;
 
 namespace lms_it13.Views
 {
     public partial class BrowseBooksControl : UserControl
     {
-        private Label lblTitle;
-        private Label lblAllBooks;
-        private Label lblRemaining;
+        private DataGridView dgvBrowse;
         private TextBox txtSearch;
-        private Button btnAdd;
-        private Button btnImport;
-        private DataGridView gridBooks;
-        private Panel topPanel;
-        private Button btnBorrow;
+        private Button btnSearch;
 
+        private string currentUsername;
 
-        public BrowseBooksControl()
+        public BrowseBooksControl(string username)
         {
+            currentUsername = username;
             BuildUI();
-            LoadDummyData();
+            LoadBooks();
         }
 
         private void BuildUI()
@@ -30,179 +25,167 @@ namespace lms_it13.Views
             this.Dock = DockStyle.Fill;
             this.BackColor = ColorTranslator.FromHtml("#F7F8F0");
 
-            // ===== GRID =====
-            gridBooks = new DataGridView();
-            gridBooks.Dock = DockStyle.Fill;
-            gridBooks.BackgroundColor = Color.White;
-            gridBooks.BorderStyle = BorderStyle.None;
-            gridBooks.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            gridBooks.AllowUserToAddRows = false;
-            gridBooks.RowHeadersVisible = false;
-            gridBooks.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            gridBooks.MultiSelect = false;
-            gridBooks.EnableHeadersVisualStyles = false;
-            gridBooks.DefaultCellStyle.SelectionBackColor = Color.White;
-            gridBooks.DefaultCellStyle.SelectionForeColor = Color.Black;
-            gridBooks.GridColor = Color.LightGray;
-            gridBooks.DefaultCellStyle.SelectionBackColor =
-    ColorTranslator.FromHtml("#DCEAF5");
+            // ===== SEARCH BAR =====
+            txtSearch = new TextBox()
+            {
+                PlaceholderText = "Search by title, author, or ISBN...",
+                Width = 300
+            };
 
-            gridBooks.DefaultCellStyle.SelectionForeColor = Color.Black;
+            btnSearch = new Button()
+            {
+                Text = "Search",
+                Width = 100,
+                BackColor = ColorTranslator.FromHtml("#355872"),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat
+            };
 
-            this.Controls.Add(gridBooks);
+            btnSearch.Click += BtnSearch_Click;
 
-            // ===== TOP PANEL =====
-            topPanel = new Panel();
+            FlowLayoutPanel topPanel = new FlowLayoutPanel();
             topPanel.Dock = DockStyle.Top;
-            topPanel.Height = 130;
-            topPanel.Padding = new Padding(20);
-            topPanel.BackColor = ColorTranslator.FromHtml("#F7F8F0");
+            topPanel.Height = 60;
+            topPanel.Padding = new Padding(20, 15, 0, 0);
+            topPanel.Controls.Add(txtSearch);
+            topPanel.Controls.Add(btnSearch);
+
+            // ===== DATAGRID =====
+            dgvBrowse = new DataGridView();
+            dgvBrowse.Dock = DockStyle.Fill;
+            dgvBrowse.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            dgvBrowse.AllowUserToAddRows = false;
+            dgvBrowse.ReadOnly = true;
+            dgvBrowse.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgvBrowse.RowHeadersVisible = false;
+
+            dgvBrowse.Columns.Add("ISBN", "ISBN");
+            dgvBrowse.Columns.Add("Title", "Title");
+            dgvBrowse.Columns.Add("Author", "Author");
+            dgvBrowse.Columns.Add("Section", "Section");
+            dgvBrowse.Columns.Add("AvailableCopies", "Available Copies");
+
+            DataGridViewButtonColumn borrowBtn = new DataGridViewButtonColumn();
+            borrowBtn.Name = "Borrow";
+            borrowBtn.Text = "Borrow";
+            borrowBtn.UseColumnTextForButtonValue = true;
+            dgvBrowse.Columns.Add(borrowBtn);
+
+            dgvBrowse.CellContentClick += DgvBrowse_CellContentClick;
+
+            this.Controls.Add(dgvBrowse);
             this.Controls.Add(topPanel);
-
-            // Title
-            lblTitle = new Label();
-            lblTitle.Text = "Books";
-            lblTitle.Font = new Font("Segoe UI", 22, FontStyle.Bold);
-            lblTitle.ForeColor = ColorTranslator.FromHtml("#355872");
-            lblTitle.AutoSize = true;
-            lblTitle.Location = new Point(20, 10);
-            topPanel.Controls.Add(lblTitle);
-
-            // Stats
-            lblAllBooks = new Label();
-            lblAllBooks.Text = "All Books: 3";
-            lblAllBooks.Location = new Point(25, 65);
-            lblAllBooks.AutoSize = true;
-            topPanel.Controls.Add(lblAllBooks);
-
-            lblRemaining = new Label();
-            lblRemaining.Text = "Remaining: 3";
-            lblRemaining.Location = new Point(150, 65);
-            lblRemaining.AutoSize = true;
-            topPanel.Controls.Add(lblRemaining);
-
-            // ===== RIGHT PANEL (Search + Buttons) =====
-            Panel rightPanel = new Panel();
-            rightPanel.Dock = DockStyle.Right;
-            rightPanel.Width = 420;
-            rightPanel.Padding = new Padding(0, 40, 20, 0);
-            topPanel.Controls.Add(rightPanel);
-
-            // Search
-            txtSearch = new TextBox();
-            txtSearch.PlaceholderText = "Search book...";
-            txtSearch.Size = new Size(160, 30);
-            txtSearch.Location = new Point(0, 0);
-            rightPanel.Controls.Add(txtSearch);
-
-            // Borrow
-            btnBorrow = new Button();
-            btnBorrow.Text = "Borrow";
-            btnBorrow.Size = new Size(90, 30);
-            btnBorrow.Location = new Point(170, 0);
-            btnBorrow.BackColor = ColorTranslator.FromHtml("#7AAACE");
-            btnBorrow.ForeColor = Color.White;
-            btnBorrow.FlatStyle = FlatStyle.Flat;
-            btnBorrow.FlatAppearance.BorderSize = 0;
-            btnBorrow.Click += BtnBorrow_Click;
-            rightPanel.Controls.Add(btnBorrow);
-
-            // Add
-            btnAdd = new Button();
-            btnAdd.Text = "Add Book";
-            btnAdd.Size = new Size(100, 30);
-            btnAdd.Location = new Point(270, 0);
-            btnAdd.BackColor = ColorTranslator.FromHtml("#355872");
-            btnAdd.ForeColor = Color.White;
-            btnAdd.FlatStyle = FlatStyle.Flat;
-            btnAdd.FlatAppearance.BorderSize = 0;
-            rightPanel.Controls.Add(btnAdd);
         }
 
-        private void LoadDummyData()
+        private void LoadBooks(string search = "")
         {
-            gridBooks.Columns.Clear();
+            dgvBrowse.Rows.Clear();
 
-            gridBooks.Columns.Add("ISBN", "ISBN");
-            gridBooks.Columns.Add("Title", "Title");
-            gridBooks.Columns.Add("Author", "Author");
-            gridBooks.Columns.Add("Publisher", "Publisher");
-            gridBooks.Columns.Add("Quantity", "Qty");
-            gridBooks.Columns.Add("Remaining", "Remaining");
-            gridBooks.Columns.Add("Section", "Section");
-            gridBooks.Columns.Add("Status", "Status");
+            using (SqlConnection conn = new SqlConnection(DatabaseHelper.ConnectionString))
+            {
+                conn.Open();
 
-            gridBooks.Rows.Add(
-                "9780131103627",
-                "C Programming",
-                "Dennis Ritchie",
-                "Pearson",
-                5,
-                5,
-                "Long Loan",
-                "Available"
-            );
+                string query = @"
+                    SELECT ISBN, Title, Author, Section, AvailableCopies
+                    FROM Books
+                    WHERE (@search = '' 
+                        OR ISBN LIKE '%' + @search + '%'
+                        OR Title LIKE '%' + @search + '%'
+                        OR Author LIKE '%' + @search + '%')";
 
-            gridBooks.Rows.Add(
-                "9780201633610",
-                "Design Patterns",
-                "GoF",
-                "Addison-Wesley",
-                3,
-                2,
-                "Short Loan",
-                "Available"
-            );
+                using (SqlCommand cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@search", search);
 
-            gridBooks.Rows.Add(
-                "9780132350884",
-                "Clean Code",
-                "Robert C. Martin",
-                "Prentice Hall",
-                4,
-                1,
-                "Long Loan",
-                "Limited"
-            );
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            dgvBrowse.Rows.Add(
+                                reader["ISBN"],
+                                reader["Title"],
+                                reader["Author"],
+                                reader["Section"],
+                                reader["AvailableCopies"]
+                            );
+                        }
+                    }
+                }
+            }
         }
-        private void BtnBorrow_Click(object sender, EventArgs e)
+
+        private void BtnSearch_Click(object sender, EventArgs e)
         {
-            if (gridBooks.SelectedRows.Count == 0)
+            LoadBooks(txtSearch.Text.Trim());
+        }
+
+        private void DgvBrowse_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+
+            if (dgvBrowse.Columns[e.ColumnIndex].Name == "Borrow")
             {
-                MessageBox.Show("Please select a book first.");
-                return;
+                string isbn = dgvBrowse.Rows[e.RowIndex].Cells["ISBN"].Value.ToString();
+                int available = Convert.ToInt32(
+                    dgvBrowse.Rows[e.RowIndex].Cells["AvailableCopies"].Value
+                );
+
+                if (available <= 0)
+                {
+                    MessageBox.Show("No copies available.");
+                    return;
+                }
+
+                BorrowBook(isbn);
             }
+        }
 
-            var row = gridBooks.SelectedRows[0];
-
-            int remaining = Convert.ToInt32(row.Cells["Remaining"].Value);
-
-            if (remaining <= 0)
+        private void BorrowBook(string isbn)
+        {
+            using (SqlConnection conn = new SqlConnection(DatabaseHelper.ConnectionString))
             {
-                MessageBox.Show("This book is not available.");
-                return;
+                conn.Open();
+
+                int bookId = 0;
+
+                // Get BookId
+                string getBook = "SELECT Id FROM Books WHERE ISBN = @isbn";
+
+                using (SqlCommand cmd = new SqlCommand(getBook, conn))
+                {
+                    cmd.Parameters.AddWithValue("@isbn", isbn);
+                    bookId = (int)cmd.ExecuteScalar();
+                }
+
+                // Insert borrow record
+                string insertBorrow = @"
+                    INSERT INTO BorrowedBooks
+                    (Username, BookId, BorrowDate, DueDate, Returned)
+                    VALUES
+                    (@username, @bookId, GETDATE(), DATEADD(day, 7, GETDATE()), 0)";
+
+                using (SqlCommand cmd = new SqlCommand(insertBorrow, conn))
+                {
+                    cmd.Parameters.AddWithValue("@username", currentUsername);
+                    cmd.Parameters.AddWithValue("@bookId", bookId);
+                    cmd.ExecuteNonQuery();
+                }
+
+                // Reduce available copies
+                string updateBook = @"
+                    UPDATE Books
+                    SET AvailableCopies = AvailableCopies - 1
+                    WHERE Id = @bookId";
+
+                using (SqlCommand cmd = new SqlCommand(updateBook, conn))
+                {
+                    cmd.Parameters.AddWithValue("@bookId", bookId);
+                    cmd.ExecuteNonQuery();
+                }
             }
-
-            remaining--;
-            row.Cells["Remaining"].Value = remaining;
-
-            if (remaining == 0)
-                row.Cells["Status"].Value = "Not Available";
-
-            // 🔹 ADD TO BORROW LIST
-            BorrowRepository.BorrowedBooks.Add(new BorrowRecord
-            {
-                MemberName = "superadmin", // replace later with logged user
-                BookId = row.Cells["ISBN"].Value.ToString(),
-                Title = row.Cells["Title"].Value.ToString(),
-                BorrowDate = DateTime.Now,
-                DueDate = DateTime.Now.AddDays(7),
-                Returned = false
-            });
 
             MessageBox.Show("Book borrowed successfully!");
+            LoadBooks();
         }
-
     }
-
 }
